@@ -3,30 +3,36 @@
  */
 
 // 引用类型
-import { CascadeItem, CascadeValue } from './CascadeTypes';
+import {
+  CascadeItem,
+  CascadeValue,
+  CascadeKeys,
+  CascadeDefaultItem,
+} from './CascadeTypes';
 
 // 公共方法
 import md5 from 'md5';
 
 // 收集级联选择框数据
-class CascadeData {
-  constructor(cascades: CascadeItem[], selectionLength?: number) {
-    console.log('CascadeData constructor');
+class CascadeData<T extends CascadeItem<T> = CascadeDefaultItem> {
+  constructor(cascades: T[], { valueKey, labelKey, childrenKey }: CascadeKeys) {
     this.dataSource = cascades;
+    this.valueKey = valueKey;
+    this.labelKey = labelKey;
+    this.childrenKey = childrenKey;
     this.initRootChildrenMaps(cascades);
     this.init(cascades);
-    console.log(this.codeRoutesMap);
-    console.log(this.firstCascadeMaps);
-    console.log(this.childrenMaps);
-    console.log(this.codeChildrenMap);
-    this.length =
-      typeof selectionLength === 'number'
-        ? selectionLength
-        : this.codeNameMaps.length;
+    this.length = this.valueLabelMaps.length;
     this.initKeys();
   }
 
-  private dataSource: CascadeItem[] = [];
+  private valueKey: string = 'value';
+
+  private labelKey: string = 'label';
+
+  private childrenKey: string = 'children';
+
+  private dataSource: T[] = [];
 
   // 级联数据深度
   private length: number = 0;
@@ -34,11 +40,11 @@ class CascadeData {
   // 用于表单项循环的Key
   private keys: string[] = [];
 
-  // 以code-name形式存储的级联数据
-  private codeNameMaps: Map<CascadeValue, CascadeValue>[] = [];
+  // 以code-item形式存储的级联数据
+  private valueItemMaps: Map<CascadeValue, T>[] = [];
 
-  // 以name-code形式存储的级联数据
-  private nameCodeMaps: Map<CascadeValue, CascadeValue>[] = [];
+  // 以code-name形式存储的级联数据
+  private valueLabelMaps: Map<CascadeValue, React.ReactNode>[] = [];
 
   // 储存查询到当前节点的路径
   private codeRoutesMap: Map<CascadeValue, number[]> = new Map<
@@ -47,31 +53,25 @@ class CascadeData {
   >();
 
   // 存储所有选项中的第一个值，用于选择新选项时，重置后续级联选项
-  private firstCascadeMaps: Map<CascadeValue, CascadeItem>[] = [
-    new Map<'root', CascadeItem>(),
-  ];
+  private firstCascadeMaps: Map<CascadeValue, T>[] = [new Map<'root', T>()];
 
-  // 存储所有选项数据，可通过每一
-  private childrenMaps: Map<CascadeValue | 'root', CascadeItem[]>[] = [
-    new Map<'root', CascadeItem[]>(),
+  // 存储所有选项数据，可通过层级和Value获取下一级的选项
+  private childrenMaps: Map<CascadeValue | 'root', T[]>[] = [
+    new Map<'root', T[]>(),
   ];
 
   // 按code存储相应的children
-  private codeChildrenMap: Map<CascadeValue, CascadeItem[]> = new Map<
+  private codeChildrenMap: Map<CascadeValue, T[]> = new Map<
     CascadeValue,
-    CascadeItem[]
+    T[]
   >();
 
   // 初始化省市区数据
-  private init(
-    data: CascadeItem[],
-    level: number = 0,
-    parentIndexes: number[] = [0]
-  ) {
-    data.forEach((item: CascadeItem, index: number): void => {
+  private init(data: T[], level: number = 0, parentIndexes: number[] = [0]) {
+    data.forEach((item: T, index: number): void => {
       this.setMap(item, level, parentIndexes);
-      if (item.children) {
-        this.init(item.children, level + 1, [...parentIndexes, index]);
+      if (item[this.childrenKey]) {
+        this.init(item[this.childrenKey], level + 1, [...parentIndexes, index]);
       }
     });
   }
@@ -83,66 +83,89 @@ class CascadeData {
     }
   }
 
-  // 为级联Map数据设置值
-  private setMap(
-    cascade: CascadeItem,
-    level: number,
-    parentIndexes: number[]
-  ): void {
-    if (!this.codeNameMaps[level]) {
-      this.codeNameMaps.push(new Map());
-    }
-    this.codeNameMaps[level].set(cascade.code, cascade.name);
+  // 删除当前节点的children
+  private removeChildren(cascade: T): T {
+    let newCascade = { ...cascade };
+    delete newCascade[this.childrenKey];
+    return newCascade;
+  }
 
-    if (!this.nameCodeMaps[level]) {
-      this.nameCodeMaps.push(new Map<CascadeValue, CascadeValue>());
+  // 为级联Map数据设置值
+  private setMap(cascade: T, level: number, parentIndexes: number[]): void {
+    if (!this.valueItemMaps[level]) {
+      this.valueItemMaps.push(new Map<CascadeValue, T>());
     }
-    this.nameCodeMaps[level].set(cascade.name, cascade.code);
-    this.codeRoutesMap.set(cascade.code, parentIndexes);
-    this.codeChildrenMap.set(cascade.code, cascade.children || []);
+    if (cascade[this.labelKey]) {
+      this.valueItemMaps[level].set(
+        cascade[this.valueKey],
+        this.removeChildren(cascade)
+      );
+    }
+
+    if (!this.valueLabelMaps[level]) {
+      this.valueLabelMaps.push(new Map<CascadeValue, React.ReactNode>());
+    }
+    if (cascade[this.labelKey]) {
+      this.valueLabelMaps[level].set(
+        cascade[this.valueKey],
+        cascade[this.labelKey]
+      );
+    }
+
+    this.codeRoutesMap.set(cascade[this.valueKey], parentIndexes);
+    this.codeChildrenMap.set(
+      cascade[this.valueKey],
+      cascade[this.childrenKey]
+        ? cascade[this.childrenKey].map(
+            (cascade: T): T => this.removeChildren(cascade)
+          )
+        : []
+    );
 
     if (cascade.children) {
       !this.childrenMaps[level + 1] &&
-        this.childrenMaps.push(new Map<CascadeValue, CascadeItem[]>());
-      this.childrenMaps[level + 1].set(cascade.code, cascade.children || []);
+        this.childrenMaps.push(new Map<CascadeValue, T[]>());
+      this.childrenMaps[level + 1].set(
+        cascade[this.valueKey],
+        cascade[this.childrenKey]
+          ? cascade[this.childrenKey].map(
+              (cascade: T): T => this.removeChildren(cascade)
+            )
+          : []
+      );
 
       // 存储每个层级的第一个选项
       !this.firstCascadeMaps[level + 1] &&
-        this.firstCascadeMaps.push(new Map<CascadeValue, CascadeItem>());
-      cascade.children[0] &&
-        this.firstCascadeMaps[level + 1].set(cascade.code, {
-          code: cascade.children[0].code,
-          name: cascade.children[0].name,
-        });
+        this.firstCascadeMaps.push(new Map<CascadeValue, T>());
+      if (cascade[this.childrenKey][0]) {
+        this.firstCascadeMaps[level + 1].set(
+          cascade[this.valueKey],
+          this.removeChildren(cascade[this.childrenKey][0])
+        );
+      }
     }
   }
 
   // 初始化childrenMaps，提供每个层级的初始Map，第一层级
-  private initRootChildrenMaps(cascades: CascadeItem[]): void {
+  private initRootChildrenMaps(cascades: T[]): void {
     this.childrenMaps[0].set(
       'root',
-      cascades.map(
-        ({ code, name }: CascadeItem): CascadeItem => {
-          return {
-            code,
-            name,
-          };
-        }
-      )
+      cascades.map((cascade: T): T => this.removeChildren(cascade))
     );
-    this.codeChildrenMap.set('root', cascades);
-    cascades[0] &&
-      this.firstCascadeMaps[0].set('root', {
-        code: cascades[0].code,
-        name: cascades[0].name,
-      });
+    this.codeChildrenMap.set(
+      'root',
+      cascades.map((cascade: T): T => this.removeChildren(cascade))
+    );
+    if (cascades[0]) {
+      this.firstCascadeMaps[0].set('root', this.removeChildren(cascades[0]));
+    }
   }
 
   /**
    * getOriginalDataSource 获取原始数据
-   * @returns {CascadeItem[]}  原始数据
+   * @returns {T[]}  原始数据
    */
-  public getDataSource(): CascadeItem[] {
+  public getDataSource(): T[] {
     return this.dataSource;
   }
 
@@ -165,63 +188,65 @@ class CascadeData {
   /**
    * getName
    * @param {number} level  级联层级
-   * @param {CascadeValue} code  级联数据Code
-   * @returns {CascadeValue | undefined}  通过级联当前层Code获取相应名称
+   * @param {CascadeValue} value  级联数据Value
+   * @returns {T | undefined}  通过级联当前层Value获取相应选项
    */
-  public getName(level: number, code: CascadeValue): CascadeValue | undefined {
-    return this.codeNameMaps[level].get(code);
+  public getItem(level: number, value: CascadeValue): T | undefined {
+    return this.valueItemMaps[level].get(value);
   }
 
   /**
-   * getCode
+   * getName
    * @param {number} level  级联层级
-   * @param {CascadeValue} name  级联数据名称
-   * @returns {CascadeValue | undefined}  通过级联当前层名称获取相应Code
+   * @param {CascadeValue} value  级联数据Value
+   * @returns {React.ReactNode}  通过级联当前层Value获取相应名称
    */
-  public getCode(level: number, name: CascadeValue): CascadeValue | undefined {
-    return this.nameCodeMaps[level].get(name);
+  public getLabel(level: number, value: CascadeValue): React.ReactNode {
+    return this.valueLabelMaps[level].get(value);
   }
 
   /**
    * getSelection
    * @param {number} level  级联层级
-   * @param {CascadeValue} code  级联数据Code
-   * @returns {CascadeItem[] | undefined } 通过级联当前层Code获取子集
+   * @param {CascadeValue} value  级联数据value
+   * @returns {T[] | undefined } 通过级联当前层value获取子集
    */
-  public getSelection(level?: number, code?: CascadeValue): CascadeItem[] {
-    if (code && level) {
-      return this.childrenMaps[level].get(code) || [];
+  public getSelection(level?: number, value?: CascadeValue): T[] {
+    if (value && level) {
+      return this.childrenMaps[level].get(value) || [];
     }
     return [];
   }
 
   /**
-   * getSelectionByCode
-   * @param {CascadeValue} code  级联数据Code
-   * @returns {CascadeItem[] | undefined } 通过级联当前层Code获取子集
+   * getSelectionByValue
+   * @param {CascadeValue} value  级联数据value
+   * @returns {T[] | undefined } 通过级联当前层value获取子集
    */
-  public getSelectionByCode(code?: CascadeValue): CascadeItem[] {
-    if (code) {
-      return this.codeChildrenMap.get(code) || [];
+  public getSelectionByValue(value?: CascadeValue): T[] {
+    if (value) {
+      return this.codeChildrenMap.get(value) || [];
     }
     return [];
   }
 
   /**
    * getSelections
-   * @param {CascadeItem[]} cascades  已选择的级联数据
-   * @returns {CascadeItem[][]}  供选择的级联数据
+   * @param {T[]} cascades  已选择的级联数据
+   * @returns {T[][]}  供选择的级联数据
    */
-  public getSelections(cascades: CascadeItem[]): CascadeItem[][] {
-    let result: CascadeItem[][] = [this.childrenMaps[0].get('root') || []];
+  public getSelections(cascades: T[]): T[][] {
+    let result: T[][] = [this.childrenMaps[0].get('root') || []];
 
     if (this.length) {
       for (let index = 0; index < this.length; index++) {
-        const element = cascades[index];
+        const cascade = cascades[index];
 
         if (index < this.length - 1) {
           result.push(
-            (element && this.childrenMaps[index + 1].get(element.code)) || []
+            (cascade &&
+              this.childrenMaps[index + 1].get(cascade[this.valueKey])) ||
+              []
           );
         }
       }
@@ -233,30 +258,32 @@ class CascadeData {
   /**
    * getFirstCascade
    * @param {number} level  级联层级
-   * @param {CascadeValue} code  级联数据Code
-   * @returns {CascadeItem}  每层级项目的第一个选项
+   * @param {CascadeValue} value  级联数据value
+   * @returns {T}  每层级项目的第一个选项
    */
-  public getFirstCascade(
-    level: number,
-    code: CascadeValue
-  ): CascadeItem | undefined {
+  public getFirstCascade(level: number, value: CascadeValue): T | undefined {
     if (!level) {
       return this.firstCascadeMaps[0].get('root');
     }
 
-    return this.firstCascadeMaps[level].get(code);
+    return this.firstCascadeMaps[level].get(value);
   }
 
   /**
    * validateCascades 校验已选择的Cascade数据是否合法，但不保证数据是否在选项中存在
-   * @param {CascadeItem[]} cascades  级联层级
+   * @param {T[]} cascades  级联层级
    * @returns {boolean}  校验结果
    */
-  public static validateCascades(cascades: CascadeItem[]): boolean {
+  public validateCascades(cascades: T[]): boolean {
     if (Array.isArray(cascades) && cascades.length) {
       for (let index = 0; index < cascades.length; index++) {
-        const element = cascades[index];
-        if (!element || element.code === undefined || element.code === null) {
+        const cascade = cascades[index];
+
+        if (
+          !cascade ||
+          cascade[this.valueKey] === undefined ||
+          cascade[this.valueKey] === null
+        ) {
           return false;
         }
       }
@@ -269,19 +296,19 @@ class CascadeData {
   /**
    * cascadeValidator 基于rc-form的校验方法
    * @param {any} rule  当前表单项校验规则
-   * @param {CascadeItem[]} cascades  已选择的级联数据
+   * @param {T[]} cascades  已选择的级联数据
    * @param {any} callback  callback函数，有传参表示校验错误
    * @param {any} source  当前表单所有数据
    * @param {any} options  表单项默认选项
    */
-  public static cascadeValidator = (
+  public cascadeValidator = (
     rule: any,
-    cascades: CascadeItem[],
+    cascades: T[],
     callback: any,
     source?: any,
     options?: any
   ): void => {
-    if (CascadeData.validateCascades(cascades)) {
+    if (this.validateCascades(cascades)) {
       callback();
     } else {
       callback(

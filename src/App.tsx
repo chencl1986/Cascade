@@ -2,13 +2,25 @@ import React, { useState } from 'react';
 import './App.css';
 import Cascade from './components/Cascade/Cascade';
 import pcaCode from './json/pca-code.json';
-import { CascadeItem } from './components/Cascade/CascadeTypes';
+import { CascadeValue, CascadeKeys } from './components/Cascade/CascadeTypes';
 import getPCASelection from './services/getPCASelection';
 
+export class PCAItem {
+  code: number;
+  name: string;
+  children?: PCAItem[];
+}
+
+export const pcaCascadeKeys: CascadeKeys = {
+  valueKey: 'code',
+  labelKey: 'name',
+  childrenKey: 'children',
+};
+
 function App() {
-  const [dataSource, setDataSource] = useState<CascadeItem[][]>([
-    (pcaCode as CascadeItem[]).map(
-      (item: CascadeItem): CascadeItem => ({
+  const [dataSource, setDataSource] = useState<PCAItem[][]>([
+    (pcaCode as PCAItem[]).map(
+      (item: PCAItem): PCAItem => ({
         ...item,
         children: undefined,
       })
@@ -19,20 +31,24 @@ function App() {
 
   return (
     <div className='App'>
-      {/* <Cascade
+      <Cascade<PCAItem>
         dataSource={pcaCode}
-        onChange={async (value: CascadeItem[], level: number) => {
-          // await getPCASelection()
+        cascadeKeys={pcaCascadeKeys}
+        onChange={async (value: PCAItem[], level: number) => {
+          console.log(value, level);
         }}
-      /> */}
-      <Cascade
+      />
+      <Cascade<PCAItem>
         dataSource={dataSource}
-        onChange={async (value: CascadeItem[], level: number) => {
+        cascadeKeys={pcaCascadeKeys}
+        onChange={async (value: PCAItem[], level: number) => {
           console.log(value, level);
           if (level < dataSource.length - 1) {
-            const newCascade = await getPCASelection(value[level].code);
+            const newCascade = await getPCASelection(
+              value[level].code as CascadeValue
+            );
             const newDataSource = dataSource.map(
-              (cascades: CascadeItem[], index: number): CascadeItem[] => {
+              (cascades: PCAItem[], index: number): PCAItem[] => {
                 if (index <= level) {
                   return cascades;
                 } else if (index === level + 1) {

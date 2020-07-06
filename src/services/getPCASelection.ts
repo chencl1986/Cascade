@@ -1,5 +1,6 @@
+import { PCAItem } from '../App';
 import pcaCode from '../json/pca-code.json';
-import { CascadeValue, CascadeItem } from '../components/Cascade/CascadeTypes';
+import { CascadeValue } from '../components/Cascade/CascadeTypes';
 import CascadeData from '../components/Cascade/CascadeData';
 
 function sleep(t: number) {
@@ -8,21 +9,24 @@ function sleep(t: number) {
   });
 }
 
-const pcaData = new CascadeData(pcaCode);
+const pcaData = new CascadeData<PCAItem>(pcaCode, {
+  valueKey: 'code',
+  labelKey: 'name',
+  childrenKey: 'children',
+});
 
 // 模拟通过网络请求获取级联选项
 export default async function getPCASelection(
   code: CascadeValue
-): Promise<CascadeItem[]> {
+): Promise<PCAItem[]> {
   return new Promise(async (resolve, reject) => {
     await sleep(500);
     resolve(
-      pcaData.getSelectionByCode(code).map(
-        (item: CascadeItem): CascadeItem => {
-          return {
-            ...item,
-            children: undefined,
-          };
+      pcaData.getSelectionByValue(code).map(
+        (item: PCAItem): PCAItem => {
+          let newItem = { ...item };
+          delete newItem.children;
+          return newItem;
         }
       )
     );

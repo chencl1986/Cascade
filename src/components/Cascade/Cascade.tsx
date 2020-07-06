@@ -12,7 +12,12 @@ import './Cascade.css';
 // 引用类型
 import { RowProps } from 'antd/lib/row';
 import { ColProps } from 'antd/lib/col';
-import { CascadeItem, CascadeValue } from './CascadeTypes';
+import {
+  CascadeItem,
+  CascadeValue,
+  CascadeKeys,
+  CascadeDefaultItem,
+} from './CascadeTypes';
 
 // 常量
 
@@ -29,21 +34,25 @@ const Option = Select.Option;
 // 组件方法
 
 // 组件类型
-export interface Props {
-  value?: CascadeItem[];
-  onChange?: (value: CascadeItem[], level: number) => void;
+export interface Props<T> {
+  cascadeKeys: CascadeKeys;
+  value?: T[];
+  onChange?: (value: T[], level: number) => void;
   rowProps?: RowProps;
   colProps?: ColProps;
-  dataSource?: CascadeItem[] | CascadeData | CascadeItem[][];
+  dataSource?: T[] | CascadeData<T> | T[][];
 }
 
-export class State {
-  value: CascadeItem[] = [];
+export class State<T> {
+  value: T[] = [];
   keys: string[] = [];
 }
 
-class Cascade extends React.Component<Props, State> {
-  static defaultProps: Props = {
+class Cascade<
+  T extends CascadeItem<T> = CascadeDefaultItem
+> extends React.Component<Props<T>, State<T>> {
+  static defaultProps = {
+    cascadeKeys: new CascadeKeys(),
     rowProps: {
       gutter: 10,
     },
@@ -66,28 +75,32 @@ class Cascade extends React.Component<Props, State> {
     return keys;
   }
 
-  private buildCascadeMaps(
-    dataSource: CascadeItem[][]
-  ): Map<CascadeValue, CascadeItem>[] {
-    let cascadeMaps: Map<CascadeValue, CascadeItem>[] = [];
+  private buildCascadeMaps(dataSource: T[][]): Map<CascadeValue, T>[] {
+    let cascadeMaps: Map<CascadeValue, T>[] = [];
+    const cascadeKeys = this.props.cascadeKeys;
 
     for (let i = 0; i < dataSource.length; i++) {
       if (!cascadeMaps[i]) {
-        cascadeMaps[i] = new Map<CascadeValue, CascadeItem>();
+        cascadeMaps[i] = new Map<CascadeValue, T>();
       }
       for (let j = 0; j < dataSource[i].length; j++) {
-        cascadeMaps[i].set(dataSource[i][j].code, dataSource[i][j]);
+        if (dataSource[i][j]) {
+          cascadeMaps[i].set(
+            dataSource[i][j][cascadeKeys.valueKey],
+            dataSource[i][j]
+          );
+        }
       }
     }
 
     return cascadeMaps;
   }
 
-  private cascadeData: CascadeData;
+  private cascadeData: CascadeData<T>;
 
-  cascadeMaps: Map<CascadeValue, CascadeItem>[] = [];
+  cascadeMaps: Map<CascadeValue, T>[] = [];
 
-  constructor(props: Props) {
+  constructor(props: Props<T>) {
     super(props);
 
     const dataSource = this.props.dataSource;
@@ -97,12 +110,16 @@ class Cascade extends React.Component<Props, State> {
       if (dataSource instanceof CascadeData) {
         this.cascadeData = dataSource;
       } else if (!Array.isArray(dataSource[0])) {
-        this.cascadeData = new CascadeData(dataSource as CascadeItem[]);
+        this.cascadeData = new CascadeData(
+          dataSource as T[],
+          this.props.cascadeKeys
+        );
       } else {
         keys = Cascade.buildKeys(dataSource.length);
-        this.cascadeMaps = this.buildCascadeMaps(dataSource as CascadeItem[][]);
+        this.cascadeMaps = this.buildCascadeMaps(dataSource as T[][]);
       }
     }
+    console.log(this.cascadeData);
 
     this.state = {
       ...new State(),
@@ -111,8 +128,11 @@ class Cascade extends React.Component<Props, State> {
   }
 
   // 强制更新级联组件数据（不是一个好办法，待改进）
-  public updateDataSource = (dataSource: CascadeItem[]): void => {
-    this.cascadeData = new CascadeData(dataSource || []);
+  public updateDataSource = (dataSource: T[]): void => {
+    this.cascadeData = new CascadeData(
+      dataSource || [],
+      this.props.cascadeKeys
+    );
     this.forceUpdate();
   };
 
@@ -138,16 +158,21 @@ class Cascade extends React.Component<Props, State> {
   };
 
   // 当级联选项
-  private onSyncChange(code: CascadeValue, level: number): CascadeItem[] {
-    const name = this.cascadeData.getName(level, code) || '';
-    let value = [...this.state.value];
+  private onSyncChange(value: CascadeValue, level: number): T[] {
+    const cascadeKeys = this.props.cascadeKeys;
+    const selectedValue = this.cascadeData.getItem(level, value);
+    let selectedValues = [...this.state.value];
+    const lastSelectedValue =
+      selectedValues[level] && selectedValues[level].code;
 
-    value[level] = {
-      code,
-      name,
-    };
+    if (selectedValue) {
+      selectedValues[level] = selectedValue;
+    }
 
-    if (!value[level]) {
+    if (
+      !selectedValues[level] ||
+      lastSelectedValue !== selectedValues[level].code
+    ) {
       for (
         let index = level + 1;
         index < this.cascadeData.getLength();
@@ -155,23 +180,23 @@ class Cascade extends React.Component<Props, State> {
       ) {
         const cascade = this.cascadeData.getFirstCascade(
           index,
-          value[index - 1].code
+          selectedValues[index - 1][cascadeKeys.valueKey]
         );
 
         if (cascade) {
-          value[index] = cascade;
+          selectedValues[index] = cascade;
         } else {
           break;
         }
       }
     }
 
-    return value;
+    return selectedValues;
   }
 
   // 当异步获取级联选项时
-  private onAsyncChange(code: CascadeValue, level: number): CascadeItem[] {
-    let value = [...this.state.value];
+  private onAsyncChange(code: CascadeValue, level: number): T[] {
+    let value = this.state.value.slice(0, level);
 
     if (this.cascadeMaps[level]) {
       const selectedValue = this.cascadeMaps[level].get(code);
@@ -193,19 +218,19 @@ class Cascade extends React.Component<Props, State> {
   }
 
   // 获取级联选项
-  private getSelections(): CascadeItem[][] {
+  private getSelections(): T[][] {
     if (this.cascadeData) {
       return this.cascadeData.getSelections(this.state.value);
     } else {
-      return (this.props.dataSource as CascadeItem[][]) || [];
+      return (this.props.dataSource as T[][]) || [];
     }
   }
 
   static getDerivedStateFromProps(
-    nextProps: Props,
-    prevState: State
-  ): Partial<State> | null {
-    let nextState: Partial<State> = {};
+    nextProps: Props<any>,
+    prevState: State<any>
+  ): Partial<State<any>> | null {
+    let nextState: Partial<State<any>> = {};
     const keysLength = prevState.keys.length;
 
     if (
@@ -232,30 +257,30 @@ class Cascade extends React.Component<Props, State> {
     return nextState;
   }
 
-  getSnapshotBeforeUpdate(prevProps: Props, prevState: State): null {
+  componentDidUpdate(prevProps: Props<T>, prevState: State<T>) {
     if (prevProps.dataSource && this.props.dataSource) {
       if (
         JSON.stringify(prevProps.dataSource) !==
         JSON.stringify(this.props.dataSource)
       ) {
         this.cascadeMaps = this.buildCascadeMaps(
-          this.props.dataSource as CascadeItem[][]
+          this.props.dataSource as T[][]
         );
       }
     }
-
-    return null;
   }
 
   render() {
     const keys = this.getKeys();
+    const cascadeKeys = this.props.cascadeKeys;
 
     return (
       <Row {...this.props.rowProps}>
         {this.getSelections().map(
-          (cascades: CascadeItem[], level: number): React.ReactNode => {
+          (cascades: T[], level: number): React.ReactNode => {
             const value =
-              this.state.value[level] && this.state.value[level].code;
+              this.state.value[level] &&
+              this.state.value[level][cascadeKeys.valueKey];
 
             return (
               <Col key={keys[level]} {...this.props.colProps}>
@@ -267,13 +292,13 @@ class Cascade extends React.Component<Props, State> {
                   }}
                 >
                   {cascades.map(
-                    (cascade: CascadeItem): React.ReactNode => {
+                    (cascade: T): React.ReactNode => {
                       return (
                         <Option
-                          key={cascade.code.toString()}
-                          value={cascade.code}
+                          key={cascade[cascadeKeys.valueKey].toString()}
+                          value={cascade[cascadeKeys.valueKey]}
                         >
-                          {cascade.name}
+                          {cascade[cascadeKeys.labelKey]}
                         </Option>
                       );
                     }

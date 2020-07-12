@@ -44,7 +44,6 @@ function App() {
   }, []);
   const asyncPCAValidator = useCallback(
     (rule: RuleObject, value: PCAItem[]) => {
-      console.log(value);
       if (Array.isArray(value) && value.length === dataSource.length) {
         const index = dataSource.findIndex((item: PCAItem[]): boolean => {
           if (item === null || item === undefined) {
@@ -53,7 +52,6 @@ function App() {
             return false;
           }
         });
-        console.log(index);
         if (index < 0) {
           return Promise.resolve();
         } else {
@@ -70,6 +68,7 @@ function App() {
     <Form className={'App'} form={form}>
       <Form.Item
         name={'PCA'}
+        label={'树形级联数据'}
         rules={[
           {
             validator: pcaCascadeData.cascadeValidator,
@@ -87,6 +86,7 @@ function App() {
       </Form.Item>
       <Form.Item
         name={'AsyncPCA'}
+        label={'异步级联数据'}
         rules={[
           {
             validator: asyncPCAValidator,
@@ -98,6 +98,7 @@ function App() {
           dataSource={dataSource}
           cascadeKeys={pcaCascadeKeys}
           onChange={async (value: PCAItem[], level: number) => {
+            console.log(value, level);
             if (level < dataSource.length - 1) {
               const newCascade = await getPCASelection(
                 value[level].code as CascadeValue

@@ -25,6 +25,13 @@ const pcaCascadeData = new CascadeData<PCAItem>(pcaCode, pcaCascadeKeys);
 
 function App() {
   const [form] = Form.useForm();
+  const [pcaData, setPCAData] = useState<PCAItem[] | null>(null);
+  const [changedPCAIndex, setPCAIndex] = useState<number | null>(null);
+  const [asyncPCAData, setAsyncPCAData] = useState<PCAItem[] | null>(null);
+  const [changedAsyncPCAIndex, setAsyncPCAIndex] = useState<number | null>(
+    null
+  );
+  const [validateResult, setValidateResult] = useState<boolean | null>(null);
   const [dataSource, setDataSource] = useState<PCAItem[][]>([
     (pcaCode as PCAItem[]).map(
       (item: PCAItem): PCAItem => ({
@@ -38,7 +45,9 @@ function App() {
   const onValidate = useCallback(async () => {
     try {
       await form.validateFields();
+      setValidateResult(true);
     } catch (error) {
+      setValidateResult(false);
       console.error(error);
     }
   }, []);
@@ -69,6 +78,11 @@ function App() {
       <Form.Item
         name={'PCA'}
         label={'树形级联数据'}
+        extra={`已选择的数据：${
+          pcaData ? JSON.stringify(pcaData) : ''
+        }，变化的层级：${
+          typeof changedPCAIndex === 'number' ? changedPCAIndex : ''
+        }`}
         rules={[
           {
             validator: pcaCascadeData.cascadeValidator,
@@ -80,13 +94,19 @@ function App() {
           dataSource={pcaCascadeData}
           cascadeKeys={pcaCascadeKeys}
           onChange={async (value: PCAItem[], level: number) => {
-            console.log(value, level);
+            setPCAData(value);
+            setPCAIndex(level);
           }}
         />
       </Form.Item>
       <Form.Item
         name={'AsyncPCA'}
         label={'异步级联数据'}
+        extra={`已选择的数据：${
+          asyncPCAData ? JSON.stringify(asyncPCAData) : ''
+        }，变化的层级：${
+          typeof changedAsyncPCAIndex === 'number' ? changedAsyncPCAIndex : ''
+        }`}
         rules={[
           {
             validator: asyncPCAValidator,
@@ -98,7 +118,8 @@ function App() {
           dataSource={dataSource}
           cascadeKeys={pcaCascadeKeys}
           onChange={async (value: PCAItem[], level: number) => {
-            console.log(value, level);
+            setAsyncPCAData(value);
+            setAsyncPCAIndex(level);
             if (level < dataSource.length - 1) {
               const newCascade = await getPCASelection(
                 value[level].code as CascadeValue
@@ -120,10 +141,32 @@ function App() {
           }}
         />
       </Form.Item>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '10px',
+        }}
+      >
         <Button type={'primary'} onClick={onValidate}>
           校验表单
         </Button>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          lineHeight: '24px',
+        }}
+      >
+        校验结果：
+        {validateResult === null ? (
+          ''
+        ) : validateResult ? (
+          <span style={{ color: 'green', fontWeight: 'bold' }}>成功</span>
+        ) : (
+          <span style={{ color: 'red', fontWeight: 'bold' }}>失败</span>
+        )}
       </div>
     </Form>
   );

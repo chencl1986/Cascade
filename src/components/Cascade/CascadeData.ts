@@ -16,6 +16,7 @@ import md5 from 'md5';
 // 收集级联选择框数据
 class CascadeData<T extends CascadeItem<T> = CascadeDefaultItem> {
   constructor(cascades: T[], { valueKey, labelKey, childrenKey }: CascadeKeys) {
+    
     this.dataSource = cascades;
     this.valueKey = valueKey;
     this.labelKey = labelKey;

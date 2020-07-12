@@ -34,13 +34,13 @@ const Option = Select.Option;
 // 组件方法
 
 // 组件类型
-export interface Props<T> {
-  cascadeKeys: CascadeKeys;
-  value?: T[];
-  onChange?: (value: T[], level: number) => void;
-  rowProps?: RowProps;
-  colProps?: ColProps;
-  dataSource?: T[] | CascadeData<T> | T[][];
+interface Props<T> {
+  cascadeKeys?: CascadeKeys; // 自定义 dataSource 中 value label children 的字段
+  value?: T[]; // 指定当前选中的条目
+  onChange?: (value: T[], level: number) => void; // 选中选项时，调用此函数
+  rowProps?: RowProps; // 行排列方式，可参考https://ant.design/components/grid-cn/
+  colProps?: ColProps; // 列排列方式
+  dataSource?: T[] | CascadeData<T> | T[][]; // 可选项数据源
 }
 
 export class State<T> {
@@ -77,7 +77,7 @@ class Cascade<
 
   private buildCascadeMaps(dataSource: T[][]): Map<CascadeValue, T>[] {
     let cascadeMaps: Map<CascadeValue, T>[] = [];
-    const cascadeKeys = this.props.cascadeKeys;
+    const cascadeKeys = this.props.cascadeKeys || new CascadeKeys();
 
     for (let i = 0; i < dataSource.length; i++) {
       if (!cascadeMaps[i]) {
@@ -112,14 +112,13 @@ class Cascade<
       } else if (!Array.isArray(dataSource[0])) {
         this.cascadeData = new CascadeData(
           dataSource as T[],
-          this.props.cascadeKeys
+          this.props.cascadeKeys || new CascadeKeys()
         );
       } else {
         keys = Cascade.buildKeys(dataSource.length);
         this.cascadeMaps = this.buildCascadeMaps(dataSource as T[][]);
       }
     }
-    console.log(this.cascadeData);
 
     this.state = {
       ...new State(),
@@ -131,7 +130,7 @@ class Cascade<
   public updateDataSource = (dataSource: T[]): void => {
     this.cascadeData = new CascadeData(
       dataSource || [],
-      this.props.cascadeKeys
+      this.props.cascadeKeys || new CascadeKeys()
     );
     this.forceUpdate();
   };
@@ -159,7 +158,7 @@ class Cascade<
 
   // 当级联选项
   private onSyncChange(value: CascadeValue, level: number): T[] {
-    const cascadeKeys = this.props.cascadeKeys;
+    const cascadeKeys = this.props.cascadeKeys || new CascadeKeys();
     const selectedValue = this.cascadeData.getItem(level, value);
     let selectedValues = [...this.state.value];
     const lastSelectedValue =
@@ -272,7 +271,7 @@ class Cascade<
 
   render() {
     const keys = this.getKeys();
-    const cascadeKeys = this.props.cascadeKeys;
+    const cascadeKeys = this.props.cascadeKeys || new CascadeKeys();
 
     return (
       <Row {...this.props.rowProps}>

@@ -40,6 +40,7 @@ interface Props<T> {
   onChange?: (value: T[], level: number) => void; // 选中选项时，调用此函数
   rowProps?: RowProps; // 行排列方式，可参考https://ant.design/components/grid-cn/
   colProps?: ColProps; // 列排列方式
+  loading?: boolean[]; // 选择框loading装填
   dataSource?: T[] | CascadeData<T> | T[][]; // 可选项数据源
 }
 
@@ -272,6 +273,7 @@ class Cascade<
   render() {
     const keys = this.getKeys();
     const cascadeKeys = this.props.cascadeKeys || new CascadeKeys();
+    const loading = this.props.loading;
 
     return (
       <Row {...this.props.rowProps}>
@@ -286,6 +288,11 @@ class Cascade<
                 <Select<CascadeValue>
                   value={value}
                   placeholder={'请选择'}
+                  loading={
+                    Array.isArray(loading) && loading[level]
+                      ? loading[level]
+                      : false
+                  }
                   onChange={(value: CascadeValue): void => {
                     this.onChange(value, level);
                   }}

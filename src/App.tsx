@@ -4,10 +4,9 @@ import Cascade from './components/Cascade/Cascade';
 import pcaCode from './json/pca-code.json';
 import { CascadeValue, CascadeKeys } from './components/Cascade/CascadeTypes';
 import getPCASelection from './services/getPCASelection';
-import { Form, Button, Input } from 'antd';
+import { Form, Button } from 'antd';
 import CascadeData from './components/Cascade/CascadeData';
 import { RuleObject } from 'antd/lib/form';
-import { StoreValue } from 'antd/lib/form/interface';
 
 export class PCAItem {
   code: number;
@@ -32,6 +31,7 @@ function App() {
     null
   );
   const [validateResult, setValidateResult] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState<boolean[]>([false, false, false]);
   const [dataSource, setDataSource] = useState<PCAItem[][]>([
     (pcaCode as PCAItem[]).map(
       (item: PCAItem): PCAItem => ({
@@ -117,9 +117,15 @@ function App() {
         <Cascade<PCAItem>
           dataSource={dataSource}
           cascadeKeys={pcaCascadeKeys}
+          loading={loading}
           onChange={async (value: PCAItem[], level: number) => {
             setAsyncPCAData(value);
             setAsyncPCAIndex(level);
+            setLoading(
+              loading.map((item: boolean, index: number): boolean =>
+                level + 1 === index ? true : item
+              )
+            );
             if (level < dataSource.length - 1) {
               const newCascade = await getPCASelection(
                 value[level].code as CascadeValue
@@ -136,6 +142,11 @@ function App() {
                 }
               );
 
+              setLoading(
+                loading.map((item: boolean, index: number): boolean =>
+                  level + 1 === index ? false : item
+                )
+              );
               setDataSource(newDataSource);
             }
           }}

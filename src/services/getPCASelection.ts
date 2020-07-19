@@ -20,7 +20,7 @@ export default async function getPCASelection(
   code: CascadeValue
 ): Promise<PCAItem[]> {
   return new Promise(async (resolve, reject) => {
-    await sleep(500);
+    await sleep(2000);
     resolve(
       pcaData.getSelectionByValue(code).map(
         (item: PCAItem): PCAItem => {

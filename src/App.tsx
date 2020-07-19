@@ -50,7 +50,7 @@ function App() {
       setValidateResult(false);
       console.error(error);
     }
-  }, []);
+  }, [form]);
   const asyncPCAValidator = useCallback(
     (rule: RuleObject, value: PCAItem[]) => {
       if (Array.isArray(value) && value.length === dataSource.length) {
@@ -70,7 +70,7 @@ function App() {
         return Promise.reject('请选择正确地址');
       }
     },
-    []
+    [dataSource]
   );
 
   return (

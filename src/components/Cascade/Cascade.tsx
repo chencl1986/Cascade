@@ -41,7 +41,7 @@ interface Props<T> {
   rowProps?: RowProps; // 行排列方式，可参考https://ant.design/components/grid-cn/
   colProps?: ColProps; // 列排列方式
   loading?: boolean[]; // 选择框loading装填
-  dataSource?: T[] | CascadeData<T> | T[][]; // 可选项数据源
+  dataSource: T[] | CascadeData<T> | T[][]; // 可选项数据源
 }
 
 export class State<T> {

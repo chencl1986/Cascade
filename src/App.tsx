@@ -77,7 +77,7 @@ function App() {
     <Form className={'App'} form={form}>
       <Form.Item
         name={'PCA'}
-        label={'树形级联数据'}
+        label={'同步级联数据'}
         extra={`已选择的数据：${
           pcaData ? JSON.stringify(pcaData) : ''
         }，变化的层级：${
@@ -126,6 +126,12 @@ function App() {
                 level + 1 === index ? true : item
               )
             );
+            setDataSource(
+              dataSource.map((cascades: PCAItem[], index: number): PCAItem[] =>
+                index <= level ? cascades : []
+              )
+            );
+
             if (level < dataSource.length - 1) {
               const newCascade = await getPCASelection(
                 value[level].code as CascadeValue
